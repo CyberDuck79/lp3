@@ -153,9 +153,9 @@ All other messages are SysEx with the header `F0 00 20 29 02 0D`:
 
 ## Known limitations
 
-- **No hotplug.** If you unplug the Launchpad and plug it back in, the script has to call `connect()` again.
+- **No automatic reconnect.** When the Launchpad is unplugged, lp3 notices on the next LED update, prints `lp3: Launchpad was unplugged, disconnected` and stops sending (`pad.connected` becomes `false`). After plugging it back in, the script has to call `connect()` again; the LED buffer is kept, so a `refresh()` restores the last frame.
 - **One Launchpad at a time.** `connect()` takes the first Launchpad Mini MK3 it finds.
-- **Unplugging while LEDs are being updated can crash matron.** ALSA fails an assertion when norns writes to a device that has just disappeared. Stop the script before unplugging the Launchpad.
+- **A small window remains where unplugging can crash matron.** When a MIDI device disappears, matron frees it right away, a few milliseconds before Lua hears about the removal. A write that lands inside that window crashes matron. This is a norns core issue that lp3 cannot fix from Lua. To be safe, stop the script before unplugging the Launchpad.
 - The automatic disconnect on script stop needs the mod to be loaded, which happens at boot when it is enabled in SYSTEM > MODS, or as soon as a script calls `require 'lp3/lib/mod'`.
 
 ## License

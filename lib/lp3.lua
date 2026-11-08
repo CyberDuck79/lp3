@@ -65,8 +65,24 @@ for x = 1, 8 do CC_TO_XY[TOP_ROW_CC[x]] = {x, 9} end
 for y = 1, 8 do CC_TO_XY[RIGHT_COL_CC[y]] = {9, y} end
 CC_TO_XY[TOP_RIGHT_CC] = {9, 9}
 
+-- true while the device we connected to is still registered with norns.
+-- When the Launchpad is unplugged, matron frees the underlying C device and
+-- norns drops it from midi.devices; writing through our stale reference
+-- after that would crash matron, so we stop using it instead.
+function lp3:_alive()
+  if not self.dev then return false end
+  if midi.devices[self.port_id] ~= self.dev then
+    print("lp3: Launchpad was unplugged, disconnected")
+    self.dev = nil
+    self.port_id = nil
+    self.connected = false
+    return false
+  end
+  return true
+end
+
 function lp3:_send_sysex(bytes)
-  if not self.dev then return end
+  if not self:_alive() then return end
   local msg = {}
   for _, b in ipairs(SYSEX_HEADER) do table.insert(msg, b) end
   for _, b in ipairs(bytes) do table.insert(msg, b) end
@@ -178,7 +194,7 @@ end
 
 --- flush the buffer to hardware in a single batched SysEx (up to 81 colourspecs)
 function lp3:refresh()
-  if not self.dev then return end
+  if not self:_alive() then return end
   local specs = {}
   for x = 1, 9 do
     for y = 1, 9 do
