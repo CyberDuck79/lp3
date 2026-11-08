@@ -130,6 +130,7 @@ function lp3:disconnect()
   if self.connected then
     self:_set_programmer_mode(false)
   end
+  if self.dev then self.dev.event = nil end
   self.connected = false
   self.dev = nil
   self.port_id = nil

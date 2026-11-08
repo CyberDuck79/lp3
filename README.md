@@ -54,7 +54,7 @@ function cleanup()
 end
 ```
 
-Always call `disconnect()` in `cleanup()`. It takes the Launchpad out of Programmer mode. Without it, the device stays in Programmer mode with the last frame on the LEDs after the script stops.
+Calling `disconnect()` in `cleanup()` is good practice: it takes the Launchpad out of Programmer mode. If a script forgets it, or crashes, the mod does it for you when the script stops: it turns the LEDs off and leaves Programmer mode for every Launchpad the script left connected.
 
 ## Coordinates
 
@@ -155,7 +155,8 @@ All other messages are SysEx with the header `F0 00 20 29 02 0D`:
 
 - **No hotplug.** If you unplug the Launchpad and plug it back in, the script has to call `connect()` again.
 - **One Launchpad at a time.** `connect()` takes the first Launchpad Mini MK3 it finds.
-- The mod registers no hooks yet. If a script stops without calling `disconnect()`, the Launchpad stays in Programmer mode until it is power-cycled or another script connects.
+- **Unplugging while LEDs are being updated can crash matron.** ALSA fails an assertion when norns writes to a device that has just disappeared. Stop the script before unplugging the Launchpad.
+- The automatic disconnect on script stop needs the mod to be loaded, which happens at boot when it is enabled in SYSTEM > MODS, or as soon as a script calls `require 'lp3/lib/mod'`.
 
 ## License
 
