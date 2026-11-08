@@ -7,6 +7,9 @@
 -- When a script stops, the mod clears and disconnects every Launchpad the
 -- script left connected, so the device never stays in Programmer mode with
 -- a frozen frame (e.g. after a crash or a missing cleanup()).
+--
+-- When a connected Launchpad is unplugged and plugged back in, the mod
+-- reconnects it and restores its LEDs.
 
 local mod = require 'core/mods'
 local lp3_lib = include('lp3/lib/lp3')
@@ -39,5 +42,18 @@ mod.hook.register('script_post_cleanup', 'lp3', function()
   end
   devices = setmetatable({}, {__mode = 'k'})
 end)
+
+-- norns has no hook for new devices, and midi.add belongs to the script
+-- (reset on every script stop), so wrap the core entry point instead.
+-- The original is kept on _norns.midi so reloading this file never wraps
+-- twice.
+_norns.midi.lp3_core_add = _norns.midi.lp3_core_add or _norns.midi.add
+_norns.midi.add = function(id, name, dev)
+  _norns.midi.lp3_core_add(id, name, dev)
+  for d in pairs(devices) do
+    local ok, err = pcall(d._reconnect, d)
+    if not ok then print('lp3: reconnect failed: ' .. tostring(err)) end
+  end
+end
 
 return api

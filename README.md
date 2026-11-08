@@ -7,6 +7,7 @@ Most norns scripts reach a Launchpad through [midigrid](https://github.com/jagge
 - **all 81 controls**: the 8×8 grid, the 8 buttons of the top row, the 8 buttons of the right column and the logo button;
 - **RGB colours**, palette colours, and the Launchpad's **built-in flash and pulse** (they run on the device, so you don't need a metro);
 - **batched LED updates**: `refresh()` sends the whole frame as a single SysEx message;
+- **hotplug**: unplug the Launchpad and plug it back in, and the mod reconnects it with its LEDs as they were;
 - **global brightness** and **sleep / wake**.
 
 ## Requirements
@@ -92,9 +93,12 @@ On the Launchpad Mini MK3, the top row is ↑ ↓ ← → Session, Drums, Keys, 
 |---|---|
 | `pad:connect()` | Finds the Launchpad's MIDI port, switches it to Programmer mode and starts listening. Returns `true` or `false`. |
 | `pad:disconnect()` | Leaves Programmer mode and releases the port. |
-| `pad.connected` | `true` after a successful `connect()`. |
+| `pad.connected` | `true` while the Launchpad is connected. |
+| `pad.status = function(connected) end` | Optional. Called with `false` when the Launchpad is unplugged and `true` when the mod has reconnected it. |
 
-`connect()` takes over the device's `event` handler. Don't open the same port with `midi.connect()` or midigrid at the same time.
+If the Launchpad is unplugged, lp3 stops sending to it and waits. When it is plugged back in, the mod reconnects it, puts it back in Programmer mode, restores the brightness and resends the LED buffer, so the grid comes back as it was. The script doesn't need to do anything. A Launchpad the script disconnected itself with `disconnect()` is not reconnected.
+
+`connect()` takes over the device's `event` and `remove` handlers. Don't open the same port with `midi.connect()` or midigrid at the same time.
 
 ### Input
 
@@ -153,10 +157,10 @@ All other messages are SysEx with the header `F0 00 20 29 02 0D`:
 
 ## Known limitations
 
-- **No automatic reconnect.** When the Launchpad is unplugged, lp3 notices on the next LED update, prints `lp3: Launchpad was unplugged, disconnected` and stops sending (`pad.connected` becomes `false`). After plugging it back in, the script has to call `connect()` again; the LED buffer is kept, so a `refresh()` restores the last frame.
 - **One Launchpad at a time.** `connect()` takes the first Launchpad Mini MK3 it finds.
 - **A small window remains where unplugging can crash matron.** When a MIDI device disappears, matron frees it right away, a few milliseconds before Lua hears about the removal. A write that lands inside that window crashes matron. This is a norns core issue that lp3 cannot fix from Lua. To be safe, stop the script before unplugging the Launchpad.
-- The automatic disconnect on script stop needs the mod to be loaded, which happens at boot when it is enabled in SYSTEM > MODS, or as soon as a script calls `require 'lp3/lib/mod'`.
+- To detect a Launchpad that comes back, the mod wraps norns' internal `_norns.midi.add`, because norns has no hook for new devices.
+- The automatic disconnect on script stop and the automatic reconnect need the mod to be loaded, which happens at boot when it is enabled in SYSTEM > MODS, or as soon as a script calls `require 'lp3/lib/mod'`.
 
 ## License
 

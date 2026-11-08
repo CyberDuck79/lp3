@@ -22,9 +22,11 @@ function lp3.new()
   d.dev = nil
   d.port_id = nil
   d.connected = false
+  d.lost = false -- true after an unplug, until the Launchpad comes back
   d.brightness = 127
   d.buffer = {} -- buffer[x][y] = {type, ...} pending state, for refresh()
   d.key = nil   -- callback: key(x, y, z)
+  d.status = nil -- optional callback: status(connected), on unplug / replug
   for x = 1, 9 do
     d.buffer[x] = {}
     for y = 1, 9 do
@@ -65,17 +67,26 @@ for x = 1, 8 do CC_TO_XY[TOP_ROW_CC[x]] = {x, 9} end
 for y = 1, 8 do CC_TO_XY[RIGHT_COL_CC[y]] = {9, y} end
 CC_TO_XY[TOP_RIGHT_CC] = {9, 9}
 
+-- the Launchpad went away (unplugged). Drop every reference to the device:
+-- matron frees the underlying C device, and writing through a stale
+-- reference would crash it. The LED buffer is kept for the reconnect.
+function lp3:_lost()
+  if not self.dev then return end
+  print("lp3: Launchpad was unplugged, waiting for it to come back")
+  self.dev = nil
+  self.port_id = nil
+  self.connected = false
+  self.lost = true
+  if self.status then self.status(false) end
+end
+
 -- true while the device we connected to is still registered with norns.
--- When the Launchpad is unplugged, matron frees the underlying C device and
--- norns drops it from midi.devices; writing through our stale reference
--- after that would crash matron, so we stop using it instead.
+-- Normally the device's remove callback has already called _lost(); this
+-- is the safety net if a send happens before that.
 function lp3:_alive()
   if not self.dev then return false end
   if midi.devices[self.port_id] ~= self.dev then
-    print("lp3: Launchpad was unplugged, disconnected")
-    self.dev = nil
-    self.port_id = nil
-    self.connected = false
+    self:_lost()
     return false
   end
   return true
@@ -136,18 +147,35 @@ function lp3:connect()
   self.port_id = id
   self.dev = midi.devices[id]
   self.dev.event = function(data) self:_handle_midi(data) end
+  self.dev.remove = function() self:_lost() end
   self:_set_programmer_mode(true)
   self.connected = true
+  self.lost = false
   print("lp3: connected on port " .. id)
   return true
+end
+
+-- called by the mod whenever norns adds a MIDI device. If we lost the
+-- Launchpad and it is back, take it over again and restore the LEDs.
+function lp3:_reconnect()
+  if not self.lost or not self:_find_port() then return end
+  if self:connect() then
+    if self.brightness ~= 127 then self:set_brightness(self.brightness) end
+    self:refresh()
+    if self.status then self.status(true) end
+  end
 end
 
 function lp3:disconnect()
   if self.connected then
     self:_set_programmer_mode(false)
   end
-  if self.dev then self.dev.event = nil end
+  if self.dev then
+    self.dev.event = nil
+    self.dev.remove = nil
+  end
   self.connected = false
+  self.lost = false
   self.dev = nil
   self.port_id = nil
 end
