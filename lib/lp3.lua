@@ -22,12 +22,12 @@ function lp3.new()
   d.dev = nil
   d.port_id = nil
   d.connected = false
-  d.lost = false -- true after an unplug, until the Launchpad comes back
+  d.waiting = false -- true while connect() waits for the Launchpad (not plugged in, or unplugged)
   d.brightness = 127
   d.buffer = {} -- buffer[x][y] = {type, ...} pending state, for refresh()
   d.sent = {}   -- sent[x][y] = colourspec last sent to the hardware
   d.key = nil   -- callback: key(x, y, z)
-  d.status = nil -- optional callback: status(connected), on unplug / replug
+  d.status = nil -- optional callback: status(connected), on unplug / (re)plug
   for x = 1, 9 do
     d.buffer[x] = {}
     d.sent[x] = {}
@@ -78,7 +78,7 @@ function lp3:_lost()
   self.dev = nil
   self.port_id = nil
   self.connected = false
-  self.lost = true
+  self.waiting = true
   if self.status then self.status(false) end
 end
 
@@ -140,10 +140,13 @@ function lp3:_handle_midi(data)
   end
 end
 
+--- connect to the Launchpad. Returns false if it isn't plugged in; the mod
+-- then connects it as soon as it appears.
 function lp3:connect()
   local id = self:_find_port()
   if not id then
-    print("lp3: no Launchpad Mini MK3 MIDI In/Out port found")
+    print("lp3: no Launchpad Mini MK3 found, waiting for it to be plugged in")
+    self.waiting = true
     return false
   end
   self.port_id = id
@@ -153,15 +156,15 @@ function lp3:connect()
   self:_forget_sent()
   self:_set_programmer_mode(true)
   self.connected = true
-  self.lost = false
+  self.waiting = false
   print("lp3: connected on port " .. id)
   return true
 end
 
--- called by the mod whenever norns adds a MIDI device. If we lost the
--- Launchpad and it is back, take it over again and restore the LEDs.
+-- called by the mod whenever norns adds a MIDI device. If we are waiting for
+-- the Launchpad and it is here, take it over and send the LED buffer.
 function lp3:_reconnect()
-  if not self.lost or not self:_find_port() then return end
+  if not self.waiting or not self:_find_port() then return end
   if self:connect() then
     if self.brightness ~= 127 then self:set_brightness(self.brightness) end
     self:refresh()
@@ -178,7 +181,7 @@ function lp3:disconnect()
     self.dev.remove = nil
   end
   self.connected = false
-  self.lost = false
+  self.waiting = false
   self.dev = nil
   self.port_id = nil
 end

@@ -7,7 +7,7 @@ Most norns scripts reach a Launchpad through [midigrid](https://github.com/jagge
 - **all 80 buttons and 81 LEDs**: the 8×8 grid, the 8 buttons of the top row, the 8 buttons of the right column, and the logo LED;
 - **RGB colours**, palette colours, and the Launchpad's **built-in flash and pulse** (they run on the device, so you don't need a metro);
 - **batched LED updates**: `refresh()` sends only the LEDs that changed, in a single SysEx message;
-- **hotplug**: unplug the Launchpad and plug it back in, and the mod reconnects it with its LEDs as they were;
+- **hotplug**: start a script before plugging the Launchpad in, or unplug it and plug it back in, and the mod connects it with its LEDs as the script drew them;
 - **global brightness** and **sleep / wake**.
 
 ## Requirements
@@ -91,12 +91,12 @@ On the Launchpad Mini MK3, the top row is ↑ ↓ ← → Session, Drums, Keys, 
 
 | Call | Description |
 |---|---|
-| `pad:connect()` | Finds the Launchpad's MIDI port, switches it to Programmer mode and starts listening. Returns `true` or `false`. |
+| `pad:connect()` | Finds the Launchpad's MIDI port, switches it to Programmer mode and starts listening. Returns `false` if the Launchpad isn't plugged in: the mod then connects it as soon as it appears. |
 | `pad:disconnect()` | Leaves Programmer mode and releases the port. |
 | `pad.connected` | `true` while the Launchpad is connected. |
-| `pad.status = function(connected) end` | Optional. Called with `false` when the Launchpad is unplugged and `true` when the mod has reconnected it. |
+| `pad.status = function(connected) end` | Optional. Called with `false` when the Launchpad is unplugged, and `true` when the mod connects it after waiting for it. |
 
-If the Launchpad is unplugged, lp3 stops sending to it and waits. When it is plugged back in, the mod reconnects it, puts it back in Programmer mode, restores the brightness and resends the LED buffer, so the grid comes back as it was. The script doesn't need to do anything. A Launchpad the script disconnected itself with `disconnect()` is not reconnected.
+If the Launchpad isn't plugged in when the script calls `connect()`, or if it is unplugged later, lp3 stops sending to it and waits. When it shows up, the mod connects it, puts it in Programmer mode, restores the brightness and sends the LED buffer, so the grid shows what the script drew in the meantime. The script doesn't need to do anything, but it shouldn't give up when `connect()` returns `false`: keep initialising and drawing as usual. A Launchpad the script disconnected itself with `disconnect()` is not reconnected.
 
 `connect()` takes over the device's `event` and `remove` handlers. Don't open the same port with `midi.connect()` or midigrid at the same time.
 

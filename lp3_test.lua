@@ -144,9 +144,10 @@ function init()
     end
   end
 
+  -- if the Launchpad isn't plugged in yet, carry on: everything below only
+  -- fills lp3's LED buffer, and the mod sends it as soon as it shows up.
   if not pad:connect() then
-    print("lp3_test: connect failed, is the Launchpad plugged in?")
-    return
+    print("lp3_test: Launchpad not plugged in yet, it will light up when it is")
   end
 
   init_pad_state()

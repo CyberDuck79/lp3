@@ -2,6 +2,9 @@
 
 ## 2026-11-09
 
+- **`connect()` waits for a Launchpad that isn't plugged in yet.** It still returns `false`, but the mod connects the Launchpad as soon as it appears, the same way it reconnects one that was unplugged, and calls `pad.status(true)`. A `disconnect()` stops the wait.
+  - *Impact on scripts:* don't stop `init()` when `connect()` returns `false`. Keep initialising and drawing: everything goes to the LED buffer, and the Launchpad shows it when it is plugged in. `lp3_test` now works this way.
+
 - **`refresh()` only sends the LEDs that changed** since the last refresh. Redrawing the whole grid every frame no longer costs anything for LEDs that did not move: one changed pad is 11 bytes instead of about 250 for a full frame. `refresh(true)` resends every LED that has been set. After a connection or a reconnection, the next `refresh()` sends everything.
   - *Impact on scripts:* none for scripts that only talk to the Launchpad through lp3. If a script also sends its own LED messages to the Launchpad, lp3 no longer knows what is displayed: call `refresh(true)` afterwards.
 - README: the logo is an LED, not a button (80 buttons, 81 LEDs).
