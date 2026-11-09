@@ -1,12 +1,12 @@
 --- lp3: direct MIDI driver for the Novation Launchpad Mini MK3 (Programmer mode)
 -- Talks to the "MIDI In/Out" port directly, bypassing midigrid, to expose
--- RGB LEDs, the 17 extra CC buttons, brightness and sleep/wake.
+-- RGB LEDs, the 16 extra CC buttons, brightness and sleep/wake.
 --
 -- Coordinate space: 9x9.
 --   x = 1..8, y = 1..8  -> main 8x8 grid (Note on/off)
 --   x = 9,    y = 1..8  -> right-side column buttons (CC 19,29,...,89)
 --   x = 1..8, y = 9     -> top row buttons (CC 91..98)
---   x = 9,    y = 9     -> top-right corner (CC 99)
+--   x = 9,    y = 9     -> logo, LED only (index 99), never sends key()
 
 local lp3 = {}
 lp3.__index = lp3
