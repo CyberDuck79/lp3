@@ -4,9 +4,9 @@ A [norns](https://monome.org/docs/norns/) mod that gives scripts direct access t
 
 Most norns scripts reach a Launchpad through [midigrid](https://github.com/jaggednz/midigrid), which makes it look like a monome grid. That works for existing grid scripts, but it hides most of the hardware. lp3 talks to the Launchpad itself and gives you:
 
-- **all 81 controls**: the 8×8 grid, the 8 buttons of the top row, the 8 buttons of the right column and the logo button;
+- **all 80 buttons and 81 LEDs**: the 8×8 grid, the 8 buttons of the top row, the 8 buttons of the right column, and the logo LED;
 - **RGB colours**, palette colours, and the Launchpad's **built-in flash and pulse** (they run on the device, so you don't need a metro);
-- **batched LED updates**: `refresh()` sends the whole frame as a single SysEx message;
+- **batched LED updates**: `refresh()` sends only the LEDs that changed, in a single SysEx message;
 - **hotplug**: unplug the Launchpad and plug it back in, and the mod reconnects it with its LEDs as they were;
 - **global brightness** and **sleep / wake**.
 
@@ -63,7 +63,7 @@ Coordinates go from 1 to 9 on both axes. `y = 1` is the **bottom** row.
 
 ```
  y
- 9   [91][92][93][94][95][96][97][98]  [99]   top row (CC)   + logo (CC 99)
+ 9   [91][92][93][94][95][96][97][98]  [99]   top row (CC)   + logo (LED only)
  8   [81][82][83][84][85][86][87][88]  [89]
  7   [71] .   .   .   .   .   .  [78]  [79]
  6    .                           .    [69]
@@ -118,12 +118,12 @@ These calls only write to a buffer. Nothing changes on the Launchpad until you c
 | `pad:led_rgb(x, y, r, g, b)` | Static RGB colour, each channel `0`–`127`. |
 | `pad:led_flash(x, y, color, color_b)` | Flashes between `color` and `color_b`, in sync with the MIDI clock the Launchpad receives (120 BPM by default). |
 | `pad:led_pulse(x, y, color)` | Pulses (breathes) a palette colour, in sync with the clock too. |
-| `pad:all(color)` | Sets all 81 controls to a palette colour (default `0`). |
-| `pad:refresh()` | Sends the whole buffer as one SysEx message. |
+| `pad:all(color)` | Sets all 81 LEDs to a palette colour (default `0`). |
+| `pad:refresh()` | Sends the LEDs that changed since the last refresh, as one SysEx message. `pad:refresh(true)` resends every LED that has been set. |
 
 The palette colours are listed in Novation's *Launchpad Mini MK3 Programmer's Reference Manual*. Some common values: `5` red, `9` orange, `13` yellow, `21` green, `37` cyan, `45` blue, `53` magenta, `57` pink, `3` white.
 
-`refresh()` resends every control that has ever been set, not only the ones that changed. Batch your changes and call it once per frame rather than after every `led()` call.
+`refresh()` only sends what changed, so redrawing the whole grid from scratch every frame is cheap: unchanged LEDs cost nothing on the MIDI side. Still, batch your changes and call it once per frame rather than after every `led()` call. After a (re)connection, the next `refresh()` sends everything, since the Launchpad's state is unknown.
 
 ### Device
 

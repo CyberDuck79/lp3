@@ -25,10 +25,12 @@ function lp3.new()
   d.lost = false -- true after an unplug, until the Launchpad comes back
   d.brightness = 127
   d.buffer = {} -- buffer[x][y] = {type, ...} pending state, for refresh()
+  d.sent = {}   -- sent[x][y] = colourspec last sent to the hardware
   d.key = nil   -- callback: key(x, y, z)
   d.status = nil -- optional callback: status(connected), on unplug / replug
   for x = 1, 9 do
     d.buffer[x] = {}
+    d.sent[x] = {}
     for y = 1, 9 do
       d.buffer[x][y] = {type = 0, index = 0} -- off
     end
@@ -148,6 +150,7 @@ function lp3:connect()
   self.dev = midi.devices[id]
   self.dev.event = function(data) self:_handle_midi(data) end
   self.dev.remove = function() self:_lost() end
+  self:_forget_sent()
   self:_set_programmer_mode(true)
   self.connected = true
   self.lost = false
@@ -220,39 +223,52 @@ function lp3:all(color)
   end
 end
 
---- flush the buffer to hardware in a single batched SysEx (up to 81 colourspecs)
-function lp3:refresh()
+-- the hardware state is unknown (new connection): resend everything next time
+function lp3:_forget_sent()
+  for x = 1, 9 do self.sent[x] = {} end
+end
+
+-- colourspec bytes for a buffer cell, without the LED index
+local function cell_spec(cell)
+  if cell.type == 3 then
+    return {3, cell.r, cell.g, cell.b}
+  elseif cell.type == 1 then
+    return {1, cell.color_b or 0, cell.color}
+  elseif cell.type == 2 then
+    return {2, cell.color}
+  else
+    return {0, cell.color or 0}
+  end
+end
+
+local function same_spec(a, b)
+  if not a or #a ~= #b then return false end
+  for i = 1, #a do
+    if a[i] ~= b[i] then return false end
+  end
+  return true
+end
+
+--- send the LEDs that changed since the last refresh, in a single SysEx.
+-- pass true to resend every LED that has been set, changed or not.
+function lp3:refresh(full)
   if not self:_alive() then return end
-  local specs = {}
+  local specs = {0x03}
   for x = 1, 9 do
     for y = 1, 9 do
       local cell = self.buffer[x][y]
       if cell.target then
-        if cell.type == 3 then
-          table.insert(specs, 3)
+        local spec = cell_spec(cell)
+        if full or not same_spec(self.sent[x][y], spec) then
+          table.insert(specs, spec[1])
           table.insert(specs, cell.target)
-          table.insert(specs, cell.r)
-          table.insert(specs, cell.g)
-          table.insert(specs, cell.b)
-        elseif cell.type == 1 then
-          table.insert(specs, 1)
-          table.insert(specs, cell.target)
-          table.insert(specs, cell.color_b or 0)
-          table.insert(specs, cell.color)
-        elseif cell.type == 2 then
-          table.insert(specs, 2)
-          table.insert(specs, cell.target)
-          table.insert(specs, cell.color)
-        else
-          table.insert(specs, 0)
-          table.insert(specs, cell.target)
-          table.insert(specs, cell.color or 0)
+          for i = 2, #spec do table.insert(specs, spec[i]) end
+          self.sent[x][y] = spec
         end
       end
     end
   end
-  if #specs > 0 then
-    table.insert(specs, 1, 0x03)
+  if #specs > 1 then
     self:_send_sysex(specs)
   end
 end
